@@ -29,6 +29,7 @@ if is_torch_available():
     from transformers import (
         Adafactor,
         AdamW,
+        GPC,
         get_constant_schedule,
         get_constant_schedule_with_warmup,
         get_cosine_schedule_with_warmup,
@@ -81,7 +82,7 @@ class OptimizationTest(unittest.TestCase):
             loss = criterion(w, target)
             loss.backward()
             optimizer.step()
-            w.grad.detach_()  # No zero_grad() function on simple tensors. we do it ourselves.
+            w.grad.detach_()  # No zero_grad() function on simple tensors. We do it ourselves.
             w.grad.zero_()
         self.assertListAlmostEqual(w.tolist(), [0.4, 0.2, -0.5], tol=1e-2)
 
@@ -106,10 +107,31 @@ class OptimizationTest(unittest.TestCase):
             loss = criterion(w, target)
             loss.backward()
             optimizer.step()
-            w.grad.detach_()  # No zero_grad() function on simple tensors. we do it ourselves.
+            w.grad.detach_()  # No zero_grad() function on simple tensors. We do it ourselves.
             w.grad.zero_()
         self.assertListAlmostEqual(w.tolist(), [0.4, 0.2, -0.5], tol=1e-2)
-
+        
+    def test_gpc(self):
+        w = torch.tensor([0.1, -0.2, -0.1], requires_grad=True)
+        target = torch.tensor([0.4, 0.2, -0.5])
+        criterion = nn.MSELoss()
+        optimizer = GPC(
+            params=[w],
+            npop=20,
+            G=9.8,
+            Tetha=1,
+            MuMin=0.1,
+            MuMax= 1,
+            pSS=0.95,
+            DisplayInfo=False,
+        )
+        for _ in range(1000):
+            loss = criterion(w, target)
+            loss.backward()
+            optimizer.step()
+            w.grad.detach_()  # No zero_grad() function on simple tensors. We do it ourselves.
+            w.grad.zero_()
+        self.assertListAlmostEqual(w.tolist(), [0.4, 0.2, -0.5], tol=1e-2)
 
 @require_torch
 class ScheduleInitTest(unittest.TestCase):
