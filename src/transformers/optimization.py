@@ -669,6 +669,129 @@ class AdamW(Optimizer):
         return loss
 
 
+# Add GPC 
+class GPCOptimizer(Optimizer):
+    """
+    Implements the Giza Pyramid Construction (GPC) algorithm.
+
+    Parameters:
+        params (`Iterable[nn.parameter.Parameter]`):
+            Iterable of parameters to optimize or dictionaries defining parameter groups.
+        npop (`int`, *optional*, defaults to 20):
+            Population size.
+        G (`float`, *optional*, defaults to 9.8):
+            Gravity constant.
+        Tetha (`float`, *optional*, defaults to 1):
+            Angle.
+        MuMin (`float`, *optional*, defaults to 0.1):
+            Minimum friction coefficient.
+        MuMax (`float`, *optional*, defaults to 1):
+            Maximum friction coefficient.
+        pSS (`float`, *optional*, defaults to 0.95):
+            Substitution probability.
+        DisplayInfo (`bool`, *optional*, defaults to True):
+            Flag to display iteration information.
+    """
+
+    def __init__(
+        self,
+        params: Iterable,
+        npop: int = 20,
+        G: float = 9.8,
+        Tetha: float = 1,
+        MuMin: float = 0.1,
+        MuMax: float = 1,
+        pSS: float = 0.95,
+        DisplayInfo: bool = True
+    ):
+        defaults = {
+            'npop': npop,
+            'G': G,
+            'Tetha': Tetha,
+            'MuMin': MuMin,
+            'MuMax': MuMax,
+            'pSS': pSS,
+            'DisplayInfo': DisplayInfo
+        }
+        super().__init__(params, defaults)
+
+    def step(self, closure: Callable = None):
+        """
+        Performs a single optimization step.
+
+        Arguments:
+            closure (`Callable`, *optional*): A closure that reevaluates the model and returns the loss.
+        """
+        loss = None
+        if closure is not None:
+            loss = closure()
+
+        for group in self.param_groups:
+            problem = group['params']
+            npop = group['npop']
+            G = group['G']
+            Tetha = group['Tetha']
+            MuMin = group['MuMin']
+            MuMax = group['MuMax']
+            pSS = group['pSS']
+            DisplayInfo = group['DisplayInfo']
+
+            empty_stone = self.structure()
+            empty_stone.position = None
+            empty_stone.cost = None
+
+            best_worker = empty_stone.deepcopy()
+            best_worker.cost = np.inf
+
+            pop = empty_stone.repeat(npop)
+            for i in range(npop):
+                pop[i].position = np.random.uniform(problem.varmin, problem.varmax, problem.nvar)
+                pop[i].cost = problem.objfunc(pop[i].position)
+                if pop[i].cost <= best_worker.cost:
+                    best_worker = pop[i].deepcopy()
+
+            for i in range(npop):
+                V0 = np.random.rand(1)
+                temp_rand = np.random.rand(1)
+                Mu = MuMin + (MuMax - MuMin) * temp_rand[0]
+                d = (V0[0]**2) / ((2 * G) * (np.sin(np.deg2rad(Tetha)) + (Mu * np.cos(np.deg2rad(Tetha)))))
+                x = (V0[0]**2) / ((2 * G) * (np.sin(np.deg2rad(Tetha))))
+                epsilon = np.random.uniform(-((problem.varmax - problem.varmin) / 2), ((problem.varmax - problem.varmin) / 2), problem.nvar)
+                new_position = self.apply_bounds((pop[i].position + d) + (x * epsilon), problem.varmin, problem.varmax)
+
+                newsol = empty_stone.deepcopy()
+                newsol.position = self.substitution(pop[i].position, new_position, pSS)
+                newsol.cost = problem.objfunc(newsol.position)
+
+                if newsol.cost <= pop[i].cost:
+                    pop[i] = newsol
+                    if pop[i].cost <= best_worker.cost:
+                        best_worker = pop[i].deepcopy()
+
+            if DisplayInfo:
+                print(f"Best Cost = {best_worker.cost}")
+
+            group['best_worker'] = best_worker
+            group['bestcost'] = best_worker.cost
+            group['pop'] = pop
+
+        return loss
+
+    class structure:
+        def deepcopy(self):
+            return GPCOptimizer.structure()
+
+        def repeat(self, count):
+            return [GPCOptimizer.structure() for _ in range(count)]
+
+    def apply_bounds(self, position, varmin, varmax):
+        return np.clip(position, varmin, varmax)
+
+    def substitution(self, old_position, new_position, pSS):
+        mask = np.random.rand(len(old_position)) < pSS
+        return np.where(mask, new_position, old_position)
+
+
 class Adafactor(Optimizer):
     """
     AdaFactor pytorch implementation can be used as a drop in replacement for Adam original fairseq code:
