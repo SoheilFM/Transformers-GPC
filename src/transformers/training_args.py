@@ -174,8 +174,8 @@ class OptimizerNames(ExplicitEnum):
     GALORE_ADAMW_8BIT_LAYERWISE = "galore_adamw_8bit_layerwise"
     GALORE_ADAFACTOR_LAYERWISE = "galore_adafactor_layerwise"
     LOMO = "lomo"
-    ADALOMO = "adalomo",
-    GPC="gpc"
+    ADALOMO = "adalomo"
+    GPC = "gpc"
 
 
 # Sometimes users will pass in a `str` repr of a dict in the CLI
