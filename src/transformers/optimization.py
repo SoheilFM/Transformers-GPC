@@ -670,7 +670,7 @@ class AdamW(Optimizer):
 
 
 # Add GPC 
-class GPCOptimizer(Optimizer):
+class GPC(Optimizer):
     """
     Implements the Giza Pyramid Construction (GPC) algorithm.
 
