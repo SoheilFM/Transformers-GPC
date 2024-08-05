@@ -1298,6 +1298,20 @@ class Trainer:
             optimizer_cls = torch.optim.Adagrad
         elif args.optim == OptimizerNames.RMSPROP:
             optimizer_cls = torch.optim.RMSprop
+        elif args.optim == OptimizerNames.GPC:
+        # Import the GPC optimizer
+            from .optimization import GPC
+            optimizer_cls = GPC
+            optimizer_kwargs.update({
+                "npop": 20,
+                "G": 9.8,
+                "Tetha": 1,
+                "MuMin": 0.1,
+                "MuMax": 1,
+                "pSS": 0.95,
+                "DisplayInfo": False,
+            })
+            
         elif args.optim in [
             OptimizerNames.GALORE_ADAMW,
             OptimizerNames.GALORE_ADAMW_8BIT,
